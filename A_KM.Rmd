@@ -1,0 +1,204 @@
+---
+title: "A_KM"
+output: pdf_document
+date: "2024-04-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("/Final/Functions.R")
+```
+
+
+```{r}
+path = "/Final/KM/A/"
+
+for (i in 1:4) {
+  filename = paste0(path, "A_KM_", i, ".csv")
+  file_data = read.csv(filename)
+  assign(paste0("df", i), file_data)
+}
+```
+
+
+```{r}
+truth = read.csv("/Gridded_regions/Internship/KM/truth_km.csv")
+truth = truth[order(truth$GM_NAAM), ]
+point_data = read.csv("/Gridded_regions/Internship/point_data.csv")
+```
+
+```{r}
+library(dplyr)
+truth_numpoints = point_data %>%
+  group_by(GM_NAAM) %>%
+  summarise(Count = sum(AANTPERS_v), .groups = 'drop')
+```
+
+
+## Analysis
+
+```{r}
+for(i in 1:4){
+  df_name = paste0("df", i)
+  df_data = get(df_name)
+  size_mun = df_data %>%
+    group_by(GM_NAAM) %>%
+    summarise(Count = sum(UrbanArea), .groups = 'drop')
+  name = paste("size_mun", i)
+  assign(name, size_mun)
+}
+```
+
+```{r}
+for(i in 1:4){
+  df_name = paste0("df", i)
+  df_data = get(df_name)
+  size_mun = sum(df_data$TotalArea)
+  print(size_mun)
+}
+```
+
+## start with dasymetric mapping
+
+```{r}
+for (i in 1:4) {
+  df_name =  paste0("df", i)
+  df_data = get(df_name)
+  modified_df = points_binary(df_data)
+  assign(df_name, modified_df)
+}
+```
+
+
+```{r}
+for (i in 1:4) {
+  set.seed(123)
+  df_name <- paste0("df", i)
+  df_data <- get(df_name)
+  df_modified <- df_data %>%
+    mutate(NumPoints_2 = case_when(
+      Total_Length_mean > 0 & NumPoints == 0 & n_distinct(`C28992R1km`) == n() ~ round(runif(n(), min = 1, max = 9)),
+      TRUE ~ NumPoints
+    ))
+  assign(df_name, df_modified)
+}
+```
+
+
+```{r}
+for (i in 1:4) {
+  df_name = paste0("df", i)
+  truth_name = paste0("truth")
+
+  df_dataset = get(df_name)
+  truth_dataset = get(truth_name)
+  
+  mse_result = calculate_mse(df_dataset, truth_dataset)
+
+  km_name = paste0("km_", i)
+  assign(km_name, mse_result)
+}
+
+```
+
+```{r}
+for (i in 1:4){
+  df_name = paste0("df", i)
+  df_dataset = get(df_name)
+  
+  mse_point = calculate_metrics(point_data, df_dataset, truth_numpoints, truth)
+  
+  name = paste0("km_points_", i)
+  assign(name, mse_point)
+}
+```
+
+
+```{r}
+for (i in 1:4) {
+  km_name = paste0("km_", i)
+  points_km_name = paste0("km_points_", i)
+  
+  assign(km_name, transform(get(km_name), position = paste0('k', i), size = 'km', method = 'A'))
+
+  assign(points_km_name, transform(get(points_km_name), position = paste0('k', i), size = 'km', method = 'A'))
+}
+```
+
+```{r}
+km_mse = rbind(km_1,km_2, km_3, km_4)
+km_mse$rmse = sqrt(km_mse$mse)
+
+km_points = rbind(km_points_1, km_points_2, km_points_3, km_points_4)
+km_points$rmse = sqrt(km_points$mse)
+```
+
+```{r}
+anova_result = aov(rmse ~ position, data = km_mse)
+summary(anova_result)
+```
+
+```{r}
+anova_result = aov(rmse ~ position, data = km_points)
+summary(anova_result)
+```
+
+
+```{r}
+#library(openxlsx)
+#write.xlsx(km_mse, file = "/Final/KM/A/A_KM.xlsx")
+#write.xlsx(km_points, file = "/Final/KM/A/A_KM_points.xlsx")
+```
+
+## For the results
+
+```{r}
+for (i in 1:4) {
+  df_name = paste0("df", i)
+
+  df_dataset = get(df_name)
+  
+  distance_result = calculate_distance(df_dataset)
+
+  km_name = paste0("km_dist_result_", i)
+  assign(km_name, distance_result)
+}
+```
+
+```{r}
+for (i in 1:4){
+  df_name = paste0("df", i)
+  df_dataset = get(df_name)
+  
+  points_result = calculate_points(point_data, df_dataset)
+  
+  name = paste0("km_points_result_", i)
+  assign(name, points_result)
+}
+```
+
+```{r}
+for (i in 1:4) {
+  km_name = paste0("km_dist_result_", i)
+  points_km_name = paste0("km_points_result_", i)
+  
+  assign(km_name, transform(get(km_name), position = paste0('k', i), size = 'km', method = 'A'))
+
+  assign(points_km_name, transform(get(points_km_name), position = paste0('k', i), size = 'km', method = 'A'))
+}
+```
+
+```{r}
+km_dist_result = rbind(km_dist_result_1, km_dist_result_2, km_dist_result_3, km_dist_result_4)
+km_points_result = rbind(km_points_result_1, km_points_result_2, km_points_result_3, km_points_result_4)
+```
+
+
+```{r}
+#library(openxlsx)
+#write.xlsx(km_dist_result, file = "/Final/KM/A/A_KM_dist_result.xlsx")
+#write.xlsx(km_points_result, file = "/Final/KM/A/A_KM_points_result.xlsx")
+```

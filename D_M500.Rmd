@@ -1,0 +1,270 @@
+---
+title: "D_M500"
+output: pdf_document
+date: "2024-05-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(MASS)
+library(car)
+library(pscl)
+```
+
+```{r, warning=FALSE, message=FALSE}
+source("/Final/Functions.R")
+source("/Final/D_Functions.R")
+```
+
+
+```{r}
+path <- "/Final/M500/D/"
+
+for (i in 1:4) {
+  filename <- paste0(path, "D_M500_", i, ".csv")
+  file_data <- read.csv(filename)
+  assign(paste0("df", i), file_data)
+}
+```
+
+```{r}
+truth = read.csv("/Gridded_regions/Internship/KM/truth_km.csv")
+truth = truth[order(truth$GM_NAAM), ]
+point_data = read.csv("/Gridded_regions/Internship/point_data.csv")
+```
+
+```{r}
+library(dplyr)
+truth_numpoints <- point_data %>%
+  group_by(GM_NAAM) %>%
+  summarise(Count = sum(AANTPERS_v), .groups = 'drop')
+```
+
+
+## Analysis
+
+
+```{r}
+d_m500 = rbind(df1,df2,df3,df4)
+d_m500$AANTPERS_v_sum[is.na(d_m500$AANTPERS_v_sum)] = 0
+```
+
+```{r}
+sum(d_m500$AANTPERS_v_sum == 0)
+27111/nrow(d_m500)
+```
+
+```{r}
+summary(d_m500$UrbanArea)
+summary(d_m500$RecArea)
+summary(d_m500$AgriArea)
+summary(d_m500$AANTPERS_v_sum)
+var(d_m500$AANTPERS_v_sum)
+```
+
+```{r}
+dataframes = list(d_m500, df1, df2, df3, df4)
+columns_to_scale = c("UrbanArea", "RecArea", "AgriArea", "WaterArea")
+
+for (i in 1:length(dataframes)) {
+  df = dataframes[[i]]
+  
+  for (col in columns_to_scale) {
+    df[[col]] = scale(df[[col]])
+  }
+  
+  dataframes[[i]] = df
+}
+
+d_m500 = dataframes[[1]]
+df1 = dataframes[[2]]
+df2 = dataframes[[3]]
+df3 = dataframes[[4]]
+df4 = dataframes[[5]]
+
+```
+
+## Poisson
+
+```{r}
+pois = glm(AANTPERS_v_sum ~ UrbanArea + RecArea + factor(GM_NAAM), family = poisson(), data = d_m500)
+pois$deviance
+pois$deviance / pois$df.residua
+```
+
+
+## Zero-inflated Negative Binomial Regression
+
+```{r}
+library(caret)
+set.seed(123)
+trainIndex <- createDataPartition(d_m500$AANTPERS_v_sum, p = .5, 
+                                  list = FALSE, 
+                                  times = 1)
+
+trainData <- d_m500[ trainIndex,]
+testData  <- d_m500[-trainIndex,]
+```
+
+```{r}
+zinb_model = zeroinfl(AANTPERS_v_sum ~ 
+                        UrbanArea + 
+                        RecArea +
+                        AgriArea +
+                        factor(GM_NAAM), 
+                      data = trainData, dist = "negbin")
+```
+
+## On the test data
+
+```{r}
+zi_probs <- predict(zinb_model, newdata = testData, type = "zero")
+count_preds = predict(zinb_model, testData, type = "count")
+testData$NumPoints = ifelse(is.na(testData$Total_Length_mean), 0, (1 - zi_probs) * count_preds)
+```
+
+```{r}
+mse_result = calculate_mse_d(testData, truth)
+mse_point = calculate_metrics_d(point_data, testData, truth_numpoints, truth)
+```
+
+## On the dataframes
+
+
+```{r}
+dataframes = list(df1, df2, df3, df4)
+
+for (i in 1:length(dataframes)) {
+  df = dataframes[[i]]
+  
+  zi_probs = predict(zinb_model, df, type = "zero")
+  
+  count_preds = predict(zinb_model, df, type = "count")
+  
+  df$NumPoints = ifelse(is.na(df$Total_Length_mean), 0, (1 - zi_probs) * count_preds)
+  
+  dataframes[[i]] = df
+}
+
+df1 = dataframes[[1]]
+df2 = dataframes[[2]]
+df3 = dataframes[[3]]
+df4 = dataframes[[4]]
+```
+
+```{r}
+for (i in 1:4) {
+  df_name = paste0("df", i)
+  truth_name = paste0("truth")
+
+  df_dataset = get(df_name)
+  truth_dataset = get(truth_name)
+  
+  mse_result = calculate_mse_d(df_dataset, truth_dataset)
+
+  km_name = paste0("m500_", i)
+  assign(km_name, mse_result)
+}
+```
+
+```{r}
+for (i in 1:4){
+  df_name = paste0("df", i)
+  df_dataset = get(df_name)
+  
+  mse_point = calculate_metrics_d(point_data, df_dataset, truth_numpoints, truth)
+  
+  name = paste0("m500_points_", i)
+  assign(name, mse_point)
+}
+```
+
+```{r}
+for (i in 1:4) {
+  name = paste0("m500_", i)
+  points_name = paste0("m500_points_", i)
+  
+  assign(name, transform(get(name), position = paste0('f', i), size = 'm500', method = 'D'))
+
+  assign(points_name, transform(get(points_name), position = paste0('f', i), size = 'm500', method = 'D'))
+}
+```
+
+```{r}
+m500_mse = rbind(m500_1,m500_2, m500_3, m500_4)
+m500_mse$rmse = sqrt(m500_mse$mse)
+
+m500_points = rbind(m500_points_1, m500_points_2, m500_points_3, m500_points_4)
+m500_points$rmse = sqrt(m500_points$mse)
+```
+
+```{r}
+anova_result = aov(rmse ~ position, data = m500_mse)
+summary(anova_result)
+```
+
+```{r}
+anova_result = aov(rmse ~ position, data = m500_points)
+summary(anova_result)
+```
+
+```{r}
+#library(openxlsx)
+#write.xlsx(m500_mse, file = "/Final/M500/D/D_M500.xlsx")
+#write.xlsx(m500_points, file = "/Final/M500/D/D_M500_points.xlsx")
+```
+
+## For the results
+
+```{r}
+for (i in 1:4) {
+  df_name = paste0("df", i)
+
+  df_dataset = get(df_name)
+  
+  distance_result = calculate_distance_d(df_dataset)
+
+  name = paste0("m500_dist_result_", i)
+  assign(name, distance_result)
+}
+```
+
+```{r}
+for (i in 1:4){
+  df_name = paste0("df", i)
+  df_dataset = get(df_name)
+  
+  points_result = calculate_points_d(point_data, df_dataset)
+  
+  name = paste0("m500_points_result_", i)
+  assign(name, points_result)
+}
+```
+
+```{r}
+for (i in 1:4) {
+  name = paste0("m500_dist_result_", i)
+  points_name = paste0("m500_points_result_", i)
+  
+  assign(name, transform(get(name), position = paste0('f', i), size = 'm500', method = 'D'))
+
+  assign(points_name, transform(get(points_name), position = paste0('f', i), size = 'm500', method = 'D'))
+}
+```
+
+```{r}
+m500_dist_result = rbind(m500_dist_result_1, m500_dist_result_2, m500_dist_result_3, m500_dist_result_4)
+m500_points_result = rbind(m500_points_result_1, m500_points_result_2, m500_points_result_3, m500_points_result_4)
+```
+
+
+```{r}
+#library(openxlsx)
+#write.xlsx(m500_dist_result, file = "/Final/M500/D/D_M500_dist_result.xlsx")
+#write.xlsx(m500_points_result, file = "/Final/M500/D/D_M500_points_result.xlsx")
+```
+
+

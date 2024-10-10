@@ -1,0 +1,211 @@
+---
+title: "A_M100"
+output: pdf_document
+date: "2024-05-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+source("/Final/Functions.R")
+```
+
+
+```{r}
+path <- "/Final/M100/A/"
+
+for (i in 1:4) {
+  filename <- paste0(path, "A_M100_", i, ".csv")
+  file_data <- read.csv(filename)
+  assign(paste0("df", i), file_data)
+}
+```
+
+
+```{r}
+truth = read.csv("/Gridded_regions/Internship/KM/truth_km.csv")
+truth = truth[order(truth$GM_NAAM), ]
+point_data = read.csv("/Gridded_regions/Internship/point_data.csv")
+```
+
+```{r}
+library(dplyr)
+truth_numpoints <- point_data %>%
+  group_by(GM_NAAM) %>%
+  summarise(Count = sum(AANTPERS_v), .groups = 'drop')
+```
+
+
+## Analysis
+
+
+```{r}
+for(i in 1:4){
+  df_name = paste0("df", i)
+  df_data = get(df_name)
+  size_mun = df_data %>%
+    group_by(GM_NAAM) %>%
+    summarise(Count = sum(UrbanArea), .groups = 'drop')
+  name = paste("size_mun", i)
+  assign(name, size_mun)
+}
+```
+
+```{r}
+for(i in 1:4){
+  df_name = paste0("df", i)
+  df_data = get(df_name)
+  size_mun = sum(df_data$TotalArea)
+  print(size_mun)
+}
+```
+
+## start with dasymetric mapping
+
+```{r}
+for (i in 1:4) {
+  df_name =  paste0("df", i)
+  df_data = get(df_name)
+  modified_df = points_binary(df_data)
+  assign(df_name, modified_df)
+}
+```
+
+```{r}
+#df1[df1$NumPoints == 0 & df1$TotalArea >= 0 & !is.na(df1$Total_Length_mean), ]
+```
+
+
+```{r}
+for (i in 1:4) {
+  set.seed(123)
+  df_name <- paste0("df", i)
+  df_data <- get(df_name)
+  df_modified <- df_data %>%
+    mutate(NumPoints_2 = case_when(
+      Total_Length_mean > 0 & NumPoints == 0 & n_distinct(`C28992R100`) == n() ~ round(runif(n(), min = 1, max = 2)),
+      TRUE ~ NumPoints
+    ))
+  assign(df_name, df_modified)
+}
+
+```
+
+
+```{r}
+for (i in 1:4) {
+  df_name <- paste0("df", i)
+  truth_name <- paste0("truth")
+
+  df_dataset <- get(df_name)
+  truth_dataset <- get(truth_name)
+  
+  mse_result <- calculate_mse(df_dataset, truth_dataset)
+
+  name <- paste0("m100_", i)
+  assign(name, mse_result)
+}
+
+```
+
+```{r}
+for (i in 1:4){
+  df_name = paste0("df", i)
+  df_dataset <- get(df_name)
+  
+  mse_point = calculate_metrics(point_data, df_dataset, truth_numpoints, truth)
+  
+  name = paste0("m100_points_", i)
+  assign(name, mse_point)
+}
+```
+
+
+```{r}
+for (i in 1:4) {
+  name = paste0("m100_", i)
+  points_name = paste0("m100_points_", i)
+  
+  assign(name, transform(get(name), position = paste0('h', i), size = 'm100', method = 'A'))
+
+  assign(points_name, transform(get(points_name), position = paste0('h', i), size = 'm100', method = 'A'))
+}
+```
+
+
+```{r}
+m100_mse = rbind(m100_1,m100_2, m100_3, m100_4)
+m100_mse$rmse = sqrt(m100_mse$mse)
+
+m100_points = rbind(m100_points_1, m100_points_2, m100_points_3, m100_points_4)
+m100_points$rmse = sqrt(m100_points$mse)
+```
+
+```{r}
+anova_result = aov(rmse ~ position, data = m100_mse)
+summary(anova_result)
+```
+
+```{r}
+anova_result = aov(rmse ~ position, data = m100_points)
+summary(anova_result)
+```
+
+```{r}
+#library(openxlsx)
+#write.xlsx(m100_mse, file = "/Final/M100/A/A_M100.xlsx")
+#write.xlsx(m100_points, file = "/Final/M100/A/A_M100_points.xlsx")
+```
+
+## For the results
+
+```{r}
+for (i in 1:4) {
+  df_name = paste0("df", i)
+
+  df_dataset = get(df_name)
+  
+  distance_result = calculate_distance(df_dataset)
+
+  km_name = paste0("m100_dist_result_", i)
+  assign(km_name, distance_result)
+}
+```
+
+```{r}
+for (i in 1:4){
+  df_name = paste0("df", i)
+  df_dataset = get(df_name)
+  
+  points_result = calculate_points(point_data, df_dataset)
+  
+  name = paste0("m100_points_result_", i)
+  assign(name, points_result)
+}
+```
+
+```{r}
+for (i in 1:4) {
+  name = paste0("m100_dist_result_", i)
+  points_name = paste0("m100_points_result_", i)
+  
+  assign(name, transform(get(name), position = paste0('h', i), size = 'm100', method = 'A'))
+
+  assign(points_name, transform(get(points_name), position = paste0('h', i), size = 'm100', method = 'A'))
+}
+```
+
+```{r}
+m100_dist_result = rbind(m100_dist_result_1, m100_dist_result_2, m100_dist_result_3, m100_dist_result_4)
+m100_points_result = rbind(m100_points_result_1, m100_points_result_2, m100_points_result_3, m100_points_result_4)
+```
+
+```{r}
+#library(openxlsx)
+#write.xlsx(m100_dist_result, file = "/Final/M100/A/A_M100_dist_result.xlsx")
+#write.xlsx(m100_points_result, file = "/Final/M100/A/A_M100_points_result.xlsx")
+```
+
