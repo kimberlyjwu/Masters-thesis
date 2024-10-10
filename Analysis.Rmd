@@ -1,0 +1,906 @@
+---
+title: "Analysis"
+output: pdf_document
+date: "2024-05-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("Final/Functions.R")
+source("Final/Functions_Plots.R")
+```
+
+
+```{r}
+library(openxlsx)
+
+root_folder = "Final/" 
+subfolders = c("KM", "M500", "M100")
+prefixes = c("A", "B", "C", "D")
+
+for (subfolder in subfolders) {
+  subfolder_path = file.path(root_folder, subfolder)
+  
+  for (prefix in prefixes) {
+    folder_path = file.path(subfolder_path, prefix)
+    
+    files = list.files(path = folder_path, pattern = paste0("^", prefix, "_(KM|M500|M100)(_points)?.xlsx$"), full.names = TRUE)
+    
+    for (file in files) {
+      file_name = tools::file_path_sans_ext(basename(file))
+      
+      assign(file_name, read.xlsx(file))
+    }
+  }
+}
+```
+
+
+```{r}
+
+for (subfolder in subfolders) {
+  subfolder_path = file.path(root_folder, subfolder)
+  
+  for (prefix in prefixes) {
+    folder_path = file.path(subfolder_path, prefix)
+    
+    # Load only files with "_dist_results" and "_points_results"
+    dist_files = list.files(path = folder_path, pattern = paste0("^", prefix, "_(KM|M500|M100)_dist_result.xlsx$"), full.names = TRUE)
+    points_files = list.files(path = folder_path, pattern = paste0("^", prefix, "_(KM|M500|M100)_points_result.xlsx$"), full.names = TRUE)
+    
+    # Read the distance result files
+    for (file in dist_files) {
+      file_name = tools::file_path_sans_ext(basename(file))
+      assign(file_name, read.xlsx(file))
+    }
+    
+    # Read the points result files
+    for (file in points_files) {
+      file_name = tools::file_path_sans_ext(basename(file))
+      assign(file_name, read.xlsx(file))
+    }
+  }
+}
+```
+
+
+# Analysis Technique for points
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(Binary_KM = A_KM_points, Three_KM = B_KM_points, AW_KM = C_KM_points, ZINB_KM = D_KM_points, Binary_M500 = A_M500_points, Three_M500 = B_M500_points, AW_M500 = C_M500_points, ZINB_M500 = D_M500_points, Binary_M100 = A_M100_points, Three_M100 = B_M100_points, AW_M100 = C_M100_points, ZINB_M100 = D_M100_points)
+
+comb_points = avg_avg_rmse(dataframes)
+comb_points$method = c("Binary DM", "Three-class DM", "Areal Weighting", "ZINB", "Binary DM", "Three-class DM", "Areal Weighting", "ZINB", "Binary DM", "Three-class DM", "Areal Weighting", "ZINB")
+comb_points <- comb_points %>%
+  mutate(size = case_when(
+    size == "km" ~ "kmxkm",
+    size == "m500" ~ "500mx500m",
+    size == "m100" ~ "100mx100m"
+  ))
+
+filt_comb_points <- comb_points %>%
+  filter(!(method %in% c("Areal Weighting", "Three-class DM")))
+```
+
+```{r, warning=FALSE, message=FALSE}
+generate_plot2(comb_points, c(0, 75000), "Average RMSE for Count variable per Method")
+generate_plot2(filt_comb_points, c(0, 25000), "Average RMSE for Count variable per Method")
+```
+
+
+## KM
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(A_KM_points = A_KM_points, B_KM_points = B_KM_points, C_KM_points = C_KM_points, D_KM_points = D_KM_points)
+comb_km_points <- avg_rmse(dataframes)
+```
+
+
+```{r, message=FALSE}
+subplot_titles <- c("Binary Mapping", "Three Class Mapping", "Areal Weighting", "Regression Mapping")
+
+generate_plot(comb_km_points, c(0, 90000), "Average RMSE for Population Distribution per Mapping Technique, 1kmx1km")
+```
+
+```{r, message=FALSE}
+filtered_results <- comb_km_points[comb_km_points$dataframe %in% c("A_KM_points", "B_KM_points", "D_KM_points"),]
+
+generate_plot(filtered_results,c(5000, 30000), "Average RMSE for Population Distribution per Mapping Technique, 1kmx1km" )
+```
+
+## M500
+
+```{r, message=FALSE}
+dataframes = list(A_M500_points = A_M500_points, B_M500_points = B_M500_points, C_M500_points = C_M500_points, D_M500_points = D_M500_points)
+
+comb_m500_points = avg_rmse(dataframes)
+```
+
+
+
+```{r, message=FALSE}
+subplot_titles <- c("Binary Mapping", "Three Class Mapping", "Areal Weighting", "Regression Mapping")
+
+generate_plot(comb_m500_points, c(0,90000), "Average RMSE for Population Distribution per Mapping Technique, 500mx500m")
+```
+
+```{r, message=FALSE}
+filtered_results <- comb_m500_points[comb_m500_points$dataframe %in% c("A_M500_points", "B_M500_points"),]
+
+generate_plot(filtered_results, c(5000, 30000), "Average RMSE for Population Distribution per Mapping Technique, 500mx500m")
+```
+
+## M100
+
+```{r, message=FALSE}
+dataframes = list(A_M100_points = A_M100_points, B_M100_points = B_M100_points, C_M100_points = C_M100_points, D_M100_points = D_M100_points)
+
+comb_m100_points = avg_rmse(dataframes)
+
+#print(comb_m100_points)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("Binary Mapping", "Three Class Mapping", "Areal Weighting", "Regression Mapping")
+
+generate_plot(comb_m100_points, c(0, 75000),"Average RMSE for Population Distribution per Mapping Technique, 100mx100m" )
+```
+
+
+
+```{r, message=FALSE}
+filtered_results <- comb_m100_points[comb_m100_points$dataframe %in% c("A_M100_points", "B_M100_points"),]
+
+generate_plot(filtered_results,c(5000, 30000), "Average RMSE for Population Distribution per Mapping Technique, 100mx100m")
+```
+
+# Analysis size for points
+
+## Technique A
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(A_KM_points = A_KM_points, A_M500_points = A_M500_points, A_M100_points = A_M100_points)
+comb_a_points = avg_rmse(dataframes)
+
+#print(comb_a_points)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("1KMx1KM", "500Mx500M", "100Mx100M")
+
+generate_plot(comb_a_points, c(0, 30000), "Average RMSE for Population Distribution per Size for Binary Mapping")
+```
+
+```{r}
+tech_A = rbind(A_KM_points, A_M500_points, A_M100_points)
+summary(aov(rmse ~ size, data = tech_A))
+summary(aov(rmse ~ position, data = tech_A))
+```
+
+## Technique B (three-class)
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(B_KM_points = B_KM_points, B_M500_points = B_M500_points, B_M100_points = B_M100_points)
+comb_b_points = avg_rmse(dataframes)
+
+print(comb_b_points)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("1KMx1KM", "500Mx500M", "100Mx100M")
+
+generate_plot(comb_b_points, c(0, 30000), "Average RMSE for Population Distribution  per Size for Three-Class Mapping")
+```
+
+```{r}
+tech_B = rbind(B_KM_points, B_M500_points, B_M100_points)
+summary(aov(rmse ~ size, data = tech_B))
+summary(aov(rmse ~ position, data = tech_B))
+summary(aov(rmse ~ size + position, data = tech_B))
+```
+
+## Technique C (areal)
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(C_KM_points = C_KM_points, C_M500_points = C_M500_points, C_M100_points = C_M100_points)
+comb_c_points = avg_rmse(dataframes)
+
+#print(comb_b_points)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("1KMx1KM", "500Mx500M", "100Mx100M")
+
+generate_plot(comb_c_points, c(0, 90000), "Average RMSE for Population Distribution per size for Areal Weighting")
+```
+
+
+```{r}
+tech_C = rbind(C_KM_points, C_M500_points, C_M100_points)
+summary(aov(rmse ~ size, data = tech_C))
+```
+
+## Technique D (Regression)
+
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(D_KM_points = D_KM_points, D_M500_points = D_M500_points, D_M100_points = D_M100_points)
+comb_d_points = avg_rmse(dataframes)
+
+#print(comb_b_points)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("1KMx1KM", "500Mx500M", "100Mx100M")
+
+generate_plot(comb_d_points, c(0, 30000), "Average RMSE for Population Distribution per size for Areal Weighting")
+```
+
+
+```{r}
+tech_D = rbind(D_KM_points, D_M500_points, D_M100_points)
+summary(aov(rmse ~ size, data = tech_D))
+summary(aov(rmse ~ position + size, data = tech_D))
+```
+
+## Average RMSE
+
+```{r}
+# a: Binary Dasymetric Mapping - Count Variable
+# b: Three-Class Dasymetric Mapping
+# c: Areal Weighting
+# d: ZINB
+# km x km
+mean(A_KM_points$rmse)
+mean(B_KM_points$rmse)
+mean(C_KM_points$rmse)
+mean(D_KM_points$rmse)
+```
+
+```{r}
+# 500m x 500m
+mean(A_M500_points$rmse)
+mean(B_M500_points$rmse)
+mean(C_M500_points$rmse)
+mean(D_M500_points$rmse)
+```
+
+```{r}
+# 500m x 500m
+mean(A_M100_points$rmse)
+mean(B_M100_points$rmse)
+mean(C_M100_points$rmse)
+mean(D_M100_points$rmse)
+```
+
+
+# Coefficient of Variation
+
+```{r}
+# Binary Dasymetric Mapping
+cv_a_km = calculate_cv(A_KM_points_result)
+cv_a_m500 = calculate_cv(A_M500_points_result)
+cv_a_m100 = calculate_cv(A_M100_points_result)
+
+cv_plot(cv_a_km, ylimit = c(0,25), title = "km x km")
+cv_plot(cv_a_m500, ylimit = c(0,25), title = "500m x 500m")
+cv_plot(cv_a_m100, ylimit = c(0,25), title = "100m x 100m")
+```
+
+
+
+```{r}
+# Three-Class Dasymetric Mapping
+cv_b_km = calculate_cv(B_KM_points_result)
+cv_b_m500 = calculate_cv(B_M500_points_result)
+cv_b_m100 = calculate_cv(B_M100_points_result)
+
+cv_plot(cv_b_km, ylimit = c(0,25), title = "km x km")
+cv_plot(cv_b_m500, ylimit = c(0,25), title = "500m x 500m")
+cv_plot(cv_b_m100, ylimit = c(0,25), title = "100m x 100m")
+```
+
+```{r}
+# Areal Weighting
+cv_c_km = calculate_cv(C_KM_points_result)
+cv_c_m500 = calculate_cv(C_M500_points_result)
+cv_c_m100 = calculate_cv(C_M100_points_result)
+
+cv_plot(cv_c_km, ylimit = c(0,25), title = "km x km")
+cv_plot(cv_c_m500, ylimit = c(0,25), title = "500m x 500m")
+cv_plot(cv_c_m100, ylimit = c(0,25), title = "100m x 100m")
+```
+
+```{r}
+# ZINB
+
+cv_d_km = calculate_cv(D_KM_points_result)
+cv_d_m500 = calculate_cv(D_M500_points_result)
+cv_d_m100 = calculate_cv(D_M100_points_result)
+
+cv_plot(cv_d_km, ylimit = c(0,75), title = "km x km")
+cv_plot(cv_d_m500, ylimit = c(0,75), title = "500m x 500m")
+cv_plot(cv_d_m100, ylimit = c(0,75), title = "100m x 100m")
+```
+
+```{r}
+sum(cv_d_km$cv > 30)
+```
+
+```{r}
+# a: Binary Dasymetric Mapping - Count Variable
+# b: Three-Class Dasymetric Mapping
+# c: Areal Weighting
+# d: ZINB
+# km x km
+mean(cv_a_km$cv)
+mean(cv_b_km$cv)
+mean(cv_c_km$cv)
+mean(cv_d_km$cv)
+```
+
+```{r}
+# 500m x 500m 
+mean(cv_a_m500$cv)
+mean(cv_b_m500$cv)
+mean(cv_c_m500$cv)
+mean(cv_d_m500$cv)
+```
+
+```{r}
+# 100m x 100m
+mean(cv_a_m100$cv)
+mean(cv_b_m100$cv)
+mean(cv_c_m100$cv)
+mean(cv_d_m100$cv)
+```
+
+## ANOVA tests
+
+```{r}
+A_rmse_points = rbind(A_KM_points, A_M500_points, A_M100_points)
+B_rmse_points = rbind(B_KM_points, B_M500_points, B_M100_points)
+C_rmse_points = rbind(C_KM_points, C_M500_points, C_M100_points)
+D_rmse_points = rbind(D_KM_points, D_M500_points, D_M100_points)
+```
+
+```{r}
+# binary
+anova_result = aov(rmse ~ size + position, data = A_rmse_points)
+summary(anova_result)
+```
+
+```{r}
+anova_result = aov(rmse ~ size + position, data = B_rmse_points)
+summary(anova_result)
+```
+
+```{r}
+anova_result = aov(rmse ~ size + position, data = C_rmse_points)
+summary(anova_result)
+```
+
+```{r}
+# zinb
+anova_result = aov(rmse ~ size + position, data = D_rmse_points)
+summary(anova_result)
+```
+
+### Estimations
+
+```{r}
+A_est_points = rbind(A_KM_points_result, A_M500_points_result, A_M100_points_result)
+B_est_points = rbind(B_KM_points_result, B_M500_points_result, B_M100_points_result)
+C_est_points = rbind(C_KM_points_result, C_M500_points_result, C_M100_points_result)
+D_est_points = rbind(D_KM_points_result, D_M500_points_result, D_M100_points_result)
+```
+
+```{r}
+A_est_points$standardized_est <- ave(A_est_points$sum_value, A_est_points$GM_NAAM, FUN = scale)
+anova_result_standardized <- aov(standardized_est ~ size + position, data = A_est_points)
+summary(anova_result_standardized)
+```
+
+```{r}
+B_est_points$standardized_est <- ave(B_est_points$sum_value, B_est_points$GM_NAAM, FUN = scale)
+anova_result_standardized <- aov(standardized_est ~ size + position, data = B_est_points)
+summary(anova_result_standardized)
+```
+
+```{r}
+C_est_points$standardized_est <- ave(C_est_points$sum_value, C_est_points$GM_NAAM, FUN = scale)
+anova_result_standardized <- aov(standardized_est ~ size + position, data = C_est_points)
+summary(anova_result_standardized)
+```
+
+```{r}
+D_est_points$standardized_est <- ave(D_est_points$sum_value, D_est_points$GM_NAAM, FUN = scale)
+anova_result_standardized <- aov(standardized_est ~ size + position, data = D_est_points)
+summary(anova_result_standardized)
+```
+
+
+
+# Analysis Technique for Distance Variable
+
+```{r, warning=FALSE, message=FALSE, warning = False}
+dataframes = list(Binary_KM = A_KM, Three_KM = B_KM, AW_KM = C_KM, ZINB_KM = D_KM, Binary_M500 = A_M500, Three_M500 = B_M500, AW_M500 = C_M500, ZINB_M500 = D_M500, Binary_M100 = A_M100, Three_M100 = B_M100, AW_M100 = C_M100, ZINB_M100 = D_M100 )
+
+comb  = avg_avg_rmse(dataframes)
+comb $method = c("Binary DM", "Three-class DM", "Areal Weighting", "ZINB", "Binary DM", "Three-class DM", "Areal Weighting", "ZINB", "Binary DM", "Three-class DM", "Areal Weighting", "ZINB")
+comb  <- comb  %>%
+  mutate(size = case_when(
+    size == "km" ~ "kmxkm",
+    size == "m500" ~ "500mx500m",
+    size == "m100" ~ "100mx100m"
+  ))
+
+filt_comb  <- comb  %>%
+  filter(!(method %in% c("Areal Weighting", "Three-class DM")))
+```
+
+```{r, warning=FALSE, message=FALSE}
+generate_plot2(comb, c(0, 200), "Average RMSE for Count variable per Method")
+generate_plot2(filt_comb, c(0, 200), "Average RMSE for Count variable per Method")
+```
+
+## km
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(A_KM = A_KM, B_KM = B_KM, C_KM = C_KM, D_KM = D_KM)
+comb_km <- avg_rmse(dataframes)
+#print(comb_km)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("Binary Mapping", "Three Class Mapping", "Areal Weighting", "Regression Mapping")
+
+generate_plot(comb_km, c(0, 250), "Average RMSE for Distance variable per Mapping Technique, 1kmx1km")
+```
+
+```{r, message=FALSE}
+filtered_results <- comb_km[comb_km$dataframe %in% c("A_KM", "B_KM"),]
+
+generate_plot(filtered_results,c(0, 100),"Average RMSE for Distance variable per Mapping Technique, 1kmx1km" )
+```
+
+## M500
+
+```{r, message=FALSE}
+dataframes = list(A_M500 = A_M500, B_M500 = B_M500, C_M500 = C_M500, D_M500 = D_M500)
+
+comb_m500 = avg_rmse(dataframes)
+
+#print(comb_m500)
+```
+
+
+```{r, message=FALSE}
+subplot_titles <- c("Binary Mapping", "Three Class Mapping", "Areal Weighting", "Regression Mapping")
+
+generate_plot(comb_m500, c(0, 250), "Average RMSE for Distance variable per Mapping Technique, 500mx500m")
+```
+
+```{r, message=FALSE}
+filtered_results <- comb_m500[comb_m500$dataframe %in% c("A_M500", "B_M500"),]
+
+generate_plot(filtered_results, c(0, 100),  "Average RMSE for Distance variable per Mapping Technique, 500mx500m")
+```
+
+## M100
+
+
+```{r, message=FALSE}
+dataframes = list(A_M100 = A_M100, B_M100 = B_M100, C_M100 = C_M100, D_M100 = D_M100)
+
+comb_m100 = avg_rmse(dataframes)
+
+print(comb_m100)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("Binary Mapping", "Three Class Mapping", "Areal Weighting", "Regression Mapping")
+
+generate_plot(comb_m100, c(0, 250),"Average RMSE for Distance variable per Mapping Technique, 100mx100m" )
+```
+
+
+# Analysis size for distance variable
+## Technique A (binary)
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(A_KM = A_KM, A_M500 = A_M500, A_M100 = A_M100)
+comb_a = avg_rmse(dataframes)
+
+#print(comb_a)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("1KMx1KM", "500Mx500M", "100Mx100M")
+
+generate_plot(comb_a, c(0, 100), "Average RMSE for Distance Variable  per Size for Binary Mapping")
+```
+
+```{r}
+A = rbind(A_KM, A_M500, A_M100)
+summary(aov(rmse ~ size + position, data = A))
+```
+
+## Technique B (three-class)
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(B_KM = B_KM, B_M500 = B_M500, B_M100 = B_M100)
+comb_b = avg_rmse(dataframes)
+
+#print(comb_b)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("1KMx1KM", "500Mx500M", "100Mx100M")
+
+generate_plot(comb_b, c(0, 100), "Average RMSE for Distance Variable per Size for Three-Class Mapping")
+```
+
+```{r}
+B = rbind(B_KM, B_M500, B_M100)
+summary(aov(rmse ~ size + position, data = B))
+```
+
+## Technique C (areal)
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(C_KM = C_KM, C_M500 = C_M500, C_M100 = C_M100)
+comb_c = avg_rmse(dataframes)
+
+#print(comb_c)
+```
+
+```{r, message=FALSE}
+subplot_titles = c("1KMx1KM", "500Mx500M", "100Mx100M")
+
+generate_plot(comb_c, c(0, 250), "Average RMSE for Population Distribution per size for Areal Weighting")
+```
+
+```{r}
+C = rbind(C_KM, C_M500, C_M100)
+summary(aov(rmse ~ size, data = C))
+```
+
+## Technique D (Regression)
+
+```{r, warning=FALSE, message=FALSE}
+dataframes = list(D_KM = D_KM, D_M500 = D_M500, D_M100 = D_M100)
+comb_d = avg_rmse(dataframes)
+
+#print(comb_d)
+```
+
+```{r, message=FALSE}
+subplot_titles <- c("1KMx1KM", "500Mx500M", "100Mx100M")
+
+generate_plot(comb_d, c(0, 150), "Average RMSE for Distance Variable  per Size for Binary Mapping")
+```
+
+```{r}
+D = rbind(D_KM, D_M500, D_M100)
+summary(aov(rmse ~ size, data = D))
+```
+
+## Average RMSE
+
+```{r}
+# a: Binary Dasymetric Mapping - Count Variable
+# b: Three-Class Dasymetric Mapping
+# c: Areal Weighting
+# d: ZINB
+# km x km
+mean(A_KM$rmse)
+mean(B_KM$rmse)
+mean(C_KM$rmse)
+mean(D_KM$rmse)
+```
+
+```{r}
+# 500m x 500m
+mean(A_M500$rmse)
+mean(B_M500$rmse)
+mean(C_M500$rmse)
+mean(D_M500$rmse)
+```
+```{r}
+# 100m x 100m
+mean(A_M100$rmse)
+mean(B_M100$rmse)
+mean(C_M100$rmse)
+mean(D_M100$rmse)
+```
+
+# Coefficient of Variation
+
+
+```{r}
+# Binary Dasymetric Mapping
+cv_a_km_dist = calculate_cv2(A_KM_dist_result)
+cv_a_m500_dist = calculate_cv2(A_M500_dist_result)
+cv_a_m100_dist = calculate_cv2(A_M100_dist_result)
+
+cv_plot(cv_a_km_dist, ylimit = c(0,25), title = "km x km")
+cv_plot(cv_a_m500_dist, ylimit = c(0,25), title = "500m x 500m")
+cv_plot(cv_a_m100_dist, ylimit = c(0,25), title = "100m x 100m")
+```
+
+```{r}
+#Three-Class Dasymetric Mapping
+cv_b_km_dist = calculate_cv2(B_KM_dist_result)
+cv_b_m500_dist = calculate_cv2(B_M500_dist_result)
+cv_b_m100_dist = calculate_cv2(B_M100_dist_result)
+
+cv_plot(cv_b_km_dist, ylimit = c(0,25), title = "km x km")
+cv_plot(cv_b_m500_dist, ylimit = c(0,25), title = "500m x 500m")
+cv_plot(cv_b_m100_dist, ylimit = c(0,25), title = "100m x 100m")
+```
+
+```{r}
+# Areal Weighting
+cv_c_km_dist = calculate_cv2(C_KM_dist_result)
+cv_c_m500_dist = calculate_cv2(C_M500_dist_result)
+cv_c_m100_dist = calculate_cv2(C_M100_dist_result)
+
+cv_plot(cv_c_km_dist, ylimit = c(0,25), title = "km x km")
+cv_plot(cv_c_m500_dist, ylimit = c(0,25), title = "500m x 500m")
+cv_plot(cv_c_m100_dist, ylimit = c(0,25), title = "100m x 100m")
+```
+
+```{r}
+cv_d_km_dist = calculate_cv2(D_KM_dist_result)
+cv_d_m500_dist = calculate_cv2(D_M500_dist_result)
+cv_d_m100_dist = calculate_cv2(D_M100_dist_result)
+
+cv_plot(cv_d_km_dist, ylimit = c(0,25), title = "km x km")
+cv_plot(cv_d_m500_dist, ylimit = c(0,25), title = "500m x 500m")
+cv_plot(cv_d_m100_dist, ylimit = c(0,25), title = "100m x 100m")
+```
+
+```{r}
+# a: Binary Dasymetric Mapping - Count Variable
+# b: Three-Class Dasymetric Mapping
+# c: Areal Weighting
+# d: ZINB
+# km x km
+mean(cv_a_km_dist$cv)
+mean(cv_b_km_dist$cv)
+mean(cv_c_km_dist$cv)
+mean(cv_d_km_dist$cv)
+```
+
+```{r}
+# 500m x 500m
+mean(cv_a_m500_dist$cv)
+mean(cv_b_m500_dist$cv)
+mean(cv_c_m500_dist$cv)
+mean(cv_d_m500_dist$cv)
+```
+
+
+```{r}
+# 100m x 100m
+mean(cv_a_m100_dist$cv)
+mean(cv_b_m100_dist$cv)
+mean(cv_c_m100_dist$cv)
+mean(cv_d_m100_dist$cv)
+```
+
+## ANOVA tests
+
+### RMSE
+
+```{r}
+A_rmse_dist = rbind(A_KM, A_M500, A_M100)
+B_rmse_dist = rbind(B_KM, B_M500, B_M100)
+C_rmse_dist = rbind(C_KM, C_M500, C_M100)
+D_rmse_dist = rbind(D_KM, D_M500, D_M100)
+```
+
+```{r}
+# binary
+anova_result = aov(rmse ~ size + position, data = A_rmse_dist)
+summary(anova_result)
+```
+
+```{r}
+anova_result = aov(rmse ~ size + position, data = B_rmse_dist)
+summary(anova_result)
+```
+
+```{r}
+anova_result = aov(rmse ~ size + position, data = C_rmse_dist)
+summary(anova_result)
+```
+
+```{r}
+anova_result = aov(rmse ~ size + position, data = D_rmse_dist)
+summary(anova_result)
+```
+
+
+### Estimations
+
+```{r}
+A_est_dist = rbind(A_KM_dist_result, A_M500_dist_result, A_M100_dist_result)
+B_est_dist = rbind(B_KM_dist_result, B_M500_dist_result, B_M100_dist_result)
+C_est_dist = rbind(C_KM_dist_result, C_M500_dist_result, C_M100_dist_result)
+D_est_dist = rbind(D_KM_dist_result, D_M500_dist_result, D_M100_dist_result)
+```
+
+```{r}
+A_est_dist$standardized_est <- ave(A_est_dist$ratio, A_est_dist$GM_NAAM, FUN = scale)
+
+anova_result_standardized <- aov(standardized_est ~ size + position, data = A_est_dist)
+summary(anova_result_standardized)
+```
+
+
+```{r}
+B_est_dist$standardized_est <- ave(B_est_dist$ratio, B_est_dist$GM_NAAM, FUN = scale)
+
+anova_result_standardized <- aov(standardized_est ~ size + position, data = B_est_dist)
+summary(anova_result_standardized)
+```
+
+```{r}
+C_est_dist$standardized_est <- ave(C_est_dist$ratio, C_est_dist$GM_NAAM, FUN = scale)
+
+anova_result_standardized <- aov(standardized_est ~ size + position, data = C_est_dist)
+summary(anova_result_standardized)
+```
+
+```{r}
+D_est_dist$standardized_est <- ave(D_est_dist$ratio, D_est_dist$GM_NAAM, FUN = scale)
+
+anova_result_standardized <- aov(standardized_est ~ size + position, data = D_est_dist)
+summary(anova_result_standardized)
+```
+
+
+
+# Visualizations
+
+```{r, message=FALSE, warning=FALSE}
+library(sf)
+nl_municipalities = st_read("/KM/gemeente.gpkg")
+```
+
+
+```{r}
+sp_a_km_points = nl_municipalities %>%
+  left_join(calc_summary(A_KM_points), by = "GM_NAAM")
+sp_a_m100_points = nl_municipalities %>%
+  left_join(calc_summary(A_M100_points), by = "GM_NAAM")
+sp_d_m100_points = nl_municipalities %>%
+  left_join(calc_summary(D_M100_points), by = "GM_NAAM")
+```
+
+```{r}
+map_plot_me_points(sp_a_km_points, top_values = TRUE, x_offset = 0, y_offset = 7500, title = "Population Overestimated using Binary Dasymetric Mapping, 1kmx1km")
+map_plot_me_points(sp_a_km_points, top_values = FALSE, x_offset = -18500, y_offset = 7500, title = "Population underestimated using Binary Dasymetric Mapping, 1kmx1km")
+```
+
+
+```{r}
+map_plot_me_points(sp_a_m100_points, top_values = TRUE, x_offset = 0, y_offset = 8000, title = "Population Overestimated using Binary Dasymetric Mapping, 100mx100m")
+map_plot_me_points(sp_a_m100_points, top_values = FALSE, x_offset = -19500, y_offset = -9500, title = "Population underestimated using Binary Dasymetric Mapping, 100mx100m")
+```
+
+```{r}
+map_plot_me_points(sp_d_m100_points, top_values = TRUE, x_offset = -15000, y_offset = -500, title = "Population Overestimated using Regression Mapping, 100mx100m")
+map_plot_me_points(sp_d_m100_points, top_values = FALSE, x_offset = -19500, y_offset = 8500, title = "Population underestimated using Regression Mapping, 100mx100m")
+```
+
+
+```{r}
+map_plot_cv(sp_a_km_points, top_values = TRUE, x_offset = -12000, y_offset = -7500, title = "Coefficient Variation per Municipality using Binary Dasymetric Mapping, 1kmx1km")
+map_plot_cv(sp_a_km_points, top_values = FALSE, x_offset = -12000, y_offset = -7500, title = "Coefficient Variation per Municipality using Binary Dasymetric Mapping, 1kmx1km")
+map_plot_se(sp_a_km_points, top_values = TRUE, x_offset = -12000, y_offset = 12500, title = "Standard Deviation per Municipality using Binary Dasymetric Mapping, 1kmx1km")
+```
+
+
+```{r}
+sp_a_km = nl_municipalities %>%
+  left_join(calc_summary(A_KM), by = "GM_NAAM")
+sp_a_m100 = nl_municipalities %>%
+  left_join(calc_summary(A_M100), by = "GM_NAAM")
+sp_b_m100 = nl_municipalities %>%
+  left_join(calc_summary(B_M100), by = "GM_NAAM")
+sp_d_m100 = nl_municipalities %>%
+  left_join(calc_summary(D_M100), by = "GM_NAAM")
+```
+
+
+```{r}
+map_plot_me(sp_a_m100, top_values = TRUE, x_offset = -10000, y_offset = 7500, title = "Distance Variable Overestimated using Binary Dasymetric Mapping, 100mx100m")
+map_plot_me(sp_a_m100, top_values = FALSE, x_offset = 10000, y_offset = 7500, title = "Distance Variable underestimated using Binary Dasymetric Mapping, 100mx100m")
+```
+
+```{r}
+map_plot_me(sp_b_m100, top_values = TRUE, x_offset = -5000, y_offset = 10000, title = "Distance Variable Overestimated using Three-Class Dasymetric Mapping, 100mx100m")
+map_plot_me(sp_b_m100, top_values = FALSE, x_offset = 5000, y_offset = 10000, title = "Distance Variable underestimated using Three-Class Dasymetric Mapping, 100mx100m")
+```
+
+
+```{r}
+map_plot_me(sp_d_m100, top_values = TRUE, x_offset = -7500, y_offset = 7500, title = "Distance Variable Overestimated using Regression Mapping, 100mx100m")
+map_plot_me(sp_d_m100, top_values = FALSE, x_offset = 10000, y_offset = 7500, title = "Distance Variable underestimated using Regression Mapping, 100mx100m")
+```
+
+
+```{r}
+map_plot_cv(sp_a_km, top_values = TRUE, x_offset = 25500, y_offset = 23500, title = "Coefficient Variation per Municipality using Binary Dasymetric Mapping, 1kmx1km")
+map_plot_se(sp_a_km, top_values = TRUE, x_offset = 2000, y_offset = -8500, title = "Standard Deviation per Municipality using Binary Dasymetric Mapping, 1kmx1km")
+```
+
+
+```{r}
+ggplot(data = sp_a_m100) +
+  geom_sf(aes(fill = avg_me)) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", name = "Average Error") +
+  labs(title = "Average Error Distance for Binary Mapping, 100mx100m") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank())
+
+ggplot(data = sp_d_m100) +
+  geom_sf(aes(fill = avg_me)) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", name = "Average Error") +
+  labs(title = "Average Error Distance for Regression Mapping, 100mx100m") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank())
+```
+
+```{r}
+ggplot(data = sp_a_m100_points) +
+  geom_sf(aes(fill = avg_me)) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", name = "Average Error") +
+  labs(title = "Average Error Population for Binary Mapping 100mx100m") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank())
+
+ggplot(data = sp_d_m100_points) +
+  geom_sf(aes(fill = avg_me)) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", name = "Average Error") +
+  labs(title = "Average Error Population for Regression Mapping, 100mx100m") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank())
+```
+
+
+
+
