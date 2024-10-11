@@ -12,4 +12,8 @@ The files with the word Functions in it represent all the functions created to a
 
 The file Analysis.Rmd are used to make plots, conduct tests, visualize maps and other actions needed for the thesis.
 
+#### Important Note
+
+The data used in this study are confidential and proprietary to Statistics Netherlands, so they cannot be published. As a result, the code in this repository cannot be executed without access to the original dataset.
+
 Let me know if you have any questions and thank you for reading.
